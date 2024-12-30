@@ -1,23 +1,3 @@
-Conversation opened. 1 unread message.
-
-Skip to content
-Using Gmail with screen readers
-3 of 3,370
-Deployment File
-Inbox
-
-Atif Naseem
-Attachments
-Dec 26, 2024, 8:38 PM (4 days ago)
-to me
-
-Deployment File
- One attachment
-  •  Scanned by Gmail
-Write your reply to generate with AI
-Yes
-No
-Follow up
 # Deploy all services regarding kafka
 
 
