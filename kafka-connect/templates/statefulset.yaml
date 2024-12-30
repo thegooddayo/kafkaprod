@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "kafka-connect.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kafka-connect.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kafka-connect.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "kafka-connect.fullname" . }}-config
+                  key: bootstrap.servers
+            - name: GROUP_ID
+              value: {{ .Values.config.groupId }}
+            - name: CONFIG_STORAGE_TOPIC
+              value: {{ .Values.config.storage.config.topic }}
+            - name: OFFSET_STORAGE_TOPIC
+              value: {{ .Values.config.storage.offset.topic }}
+            - name: STATUS_STORAGE_TOPIC
+              value: {{ .Values.config.storage.status.topic }}
+            - name: CONFIG_STORAGE_REPLICATION_FACTOR
+              value: {{ .Values.config.storage.config.replicationFactor | quote }}
+            - name: OFFSET_STORAGE_REPLICATION_FACTOR
+              value: {{ .Values.config.storage.offset.replicationFactor | quote }}
+            - name: STATUS_STORAGE_REPLICATION_FACTOR
+              value: {{ .Values.config.storage.status.replicationFactor | quote }}
+            - name: CONNECT_KEY_CONVERTER
+              value: "org.apache.kafka.connect.json.JsonConverter"
+            - name: CONNECT_VALUE_CONVERTER
+              value: "org.apache.kafka.connect.json.JsonConverter"
+            - name: CONNECT_INTERNAL_KEY_CONVERTER
+              value: "org.apache.kafka.connect.json.JsonConverter"
+            - name: CONNECT_INTERNAL_VALUE_CONVERTER
+              value: "org.apache.kafka.connect.json.JsonConverter"
+            {{- if .Values.config.kafka.properties }}
+            {{- range $key, $value := .Values.config.kafka.properties }}
+            - name: CONNECT_{{ $key | upper | replace "." "_" }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.extraEnvVars }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.extraEnvVars "context" $) | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

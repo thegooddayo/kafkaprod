@@ -1,0 +1,14 @@
+apiVersion: v2
+appVersion: 1.28.0
+dependencies: []
+description: Helm chart to deploy Conduktor Console on Kubernetes
+home: https://www.conduktor.io
+icon: https://www.conduktor.io/svgs/logo/symbol.svg
+maintainers:
+- email: support@conduktor.io
+  name: Conduktor
+  url: https://docs.conduktor.io/platform
+name: console
+sources:
+- https://github.com/conduktor/conduktor-public-charts/tree/main/charts/console
+version: 1.13.0

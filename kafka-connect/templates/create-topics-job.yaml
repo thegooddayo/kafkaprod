@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}-create-topics
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "1"
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      containers:
+      - name: kafka-topics
+        image: bitnami/kafka:3.5.1
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Debug info
+          echo "Current namespace: $NAMESPACE"
+          KAFKA_SERVER="kafka-controller-0.kafka-controller-headless.${NAMESPACE}.svc.cluster.local:9092"
+          echo "Attempting to connect to: $KAFKA_SERVER"
+          
+          # Wait for Kafka (shorter timeout)
+          for i in {1..6}; do
+            if /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server $KAFKA_SERVER --list; then
+              echo "Successfully connected to Kafka"
+              break
+            fi
+            echo "Attempt $i: Waiting for Kafka..."
+            sleep 10
+          done
+
+          # Function to create topic if it doesn't exist
+          create_topic_if_missing() {
+            local topic=$1
+            local partitions=$2
+            local replication=$3
+            
+            echo "Checking topic: $topic"
+            
+            # Check if topic exists
+            if /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server $KAFKA_SERVER --describe --topic $topic > /dev/null 2>&1; then
+              echo "Topic $topic already exists, skipping..."
+            else
+              echo "Topic $topic does not exist, creating..."
+              /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server $KAFKA_SERVER \
+                --create \
+                --topic $topic \
+                --partitions $partitions \
+                --replication-factor $replication \
+                --config cleanup.policy=compact || return 1
+            fi
+          }
+
+          # Create topics if they don't exist
+          create_topic_if_missing "{{ .Values.config.storage.config.topic }}" 1 {{ .Values.config.storage.config.replicationFactor }} || exit 1
+          create_topic_if_missing "{{ .Values.config.storage.offset.topic }}" {{ .Values.config.storage.offset.partitions }} {{ .Values.config.storage.offset.replicationFactor }} || exit 1
+          create_topic_if_missing "{{ .Values.config.storage.status.topic }}" {{ .Values.config.storage.status.partitions }} {{ .Values.config.storage.status.replicationFactor }} || exit 1
+      restartPolicy: OnFailure

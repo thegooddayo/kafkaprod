@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-create-connectors
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "2"
+spec:
+  template:
+    spec:
+      containers:
+      - name: create-connectors
+        image: curlimages/curl:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          # Wait for Kafka Connect to be ready (max 5 attempts)
+          attempts=0
+          until curl -s kafka-connect:8083/connectors || [ $attempts -ge 5 ]; do
+            echo "Waiting for Kafka Connect... (attempt $(($attempts + 1))/5)"; 
+            sleep 5;
+            attempts=$((attempts + 1))
+          done
+          
+          if [ $attempts -ge 5 ]; then
+            echo "Failed to connect to Kafka Connect after 5 attempts"
+            exit 1
+          fi
+          
+          # Create/Update each connector
+          {{- range $name, $config := .Values.connectors }}
+          echo "Creating/Updating connector: {{ $name }}"
+          echo "Config structure:"
+          echo '{{ $config.config | toJson }}'
+          
+          response=$(curl -s -X PUT \
+            -H "Content-Type: application/json" \
+            -d '{{ $config.config | toJson }}' \
+            kafka-connect:8083/connectors/{{ $name }}/config)
+          
+          if echo "$response" | grep -q "error_code"; then
+            echo "Error creating/updating connector: $response"
+            exit 1
+          fi
+          {{- end }}
+      restartPolicy: OnFailure

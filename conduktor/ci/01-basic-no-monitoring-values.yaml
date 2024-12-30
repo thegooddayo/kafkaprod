@@ -1,0 +1,69 @@
+# Test is checking:
+# - basic usage of the chart is working without monitoring pod
+# - usage of a persistent volume instead of emptyDir volume for dataVolume
+nameOverride: cdkt-test-01
+config:
+  organization:
+    name: conduktor
+  admin:
+    email: admin@conduktor.io
+    password: admin
+
+  database:
+    name: platform
+    host: postgresql-hl
+    password: conduktor123
+    port: 5432
+    username: postgres
+platform:
+  startupProbe:
+    initialDelaySeconds: 60  # extra delay because of limited cpu resources
+  terminationGracePeriodSeconds: 0  # quick kill between tests
+  resources:
+    limits:
+      cpu: 1500m
+      memory: 3Gi
+    requests:
+      cpu: 500m
+      memory: 2Gi
+  dataVolume:
+    persistentVolumeClaim:
+      claimName: pv-claim
+
+platformCortex:
+  enabled: false
+  resources:
+    limits:
+      cpu: 500m
+      memory: 400Mi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+
+tests:
+  enabled: true
+
+extraDeploy:
+  - apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      name: pv001
+      labels:
+        type: local
+    spec:
+      capacity:
+        storage: 1Gi
+      accessModes:
+        - ReadWriteOnce
+      hostPath:
+        path: "/mnt/data"
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: pv-claim
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi

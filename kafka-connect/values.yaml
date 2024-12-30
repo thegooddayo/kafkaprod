@@ -1,0 +1,178 @@
+# Basic deployment configuration
+replicaCount: 1
+nameOverride: ""
+fullnameOverride: ""
+
+# Image configuration
+image:
+  registry: docker.io
+  repository: debezium/connect
+  tag: "2.5"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8083
+  annotations: {}
+
+# Kafka Connect configuration
+config:
+  bootstrapServers: "kafka-controller-headless:9092"
+  groupId: "connect-cluster"
+  
+  kafka:
+    properties:
+      # Consumer group configurations
+      group.instance.id: "connect-1"
+      session.timeout.ms: "45000"
+      heartbeat.interval.ms: "15000"
+      max.poll.interval.ms: "300000"
+      rebalance.timeout.ms: "60000"
+      
+      # Additional stability settings
+      request.timeout.ms: "20000"
+      retry.backoff.ms: "500"
+      consumer.max.poll.records: "500"
+      consumer.max.partition.fetch.bytes: "1048576"
+  
+  storage:
+    config:
+      topic: "connect-configs"
+      replicationFactor: 1
+      partitions: 1
+    offset:
+      topic: "connect-offsets"
+      replicationFactor: 1
+      partitions: 25
+    status:
+      topic: "connect-status"
+      replicationFactor: 1
+      partitions: 5
+  
+  consumer:
+    max:
+      poll:
+        interval.ms: "300000"
+  producer:
+    max:
+      request:
+        size: "10485760"
+    compression:
+      type: "snappy"
+  offset:
+    flush:
+      interval.ms: "10000"
+
+# Debezium connectors configuration
+connectors:
+  outbox:
+    config:
+      bootstrap.servers: kafka-controller-headless:9092
+      security.protocol: PLAINTEXT
+      connect.keep.alive: "false"
+      connector.class: io.debezium.connector.mysql.MySqlConnector
+      database.allowPublicKeyRetrieval: "true"
+      database.connectionTimeZone: America/Chicago
+      database.hostname: db
+      database.include.list: shared_db
+      database.password: admin1
+      database.port: "3306"
+      database.server.name: db
+      database.server.id: "123"
+      database.user: root
+      topic.prefix: dbs1
+      include.schema.changes: "false"
+      table.include.list: shared_db.event_outbox
+      key.converter: org.apache.kafka.connect.json.JsonConverter
+      value.converter: org.apache.kafka.connect.json.JsonConverter
+      key.converter.schemas.enable: "false"
+      value.converter.schemas.enable: "false"
+      transforms: outbox
+      transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+      transforms.outbox.drop.headers: "true"
+      transforms.outbox.table.expand.json.payload: "true"
+      transforms.outbox.table.fields.additional.placement: "eventtype:envelope:type"
+      transforms.outbox.route.topic.replacement: "${routedByValue}"
+      schema.history.internal.kafka.topic: schema-changes.outbox
+      schema.history.internal.kafka.bootstrap.servers: kafka-controller-headless:9092
+      schema.history.internal.kafka.security.protocol: PLAINTEXT
+
+# Resource configuration
+resources: 
+  limits:
+    memory: 4Gi
+    cpu: 1000m
+  requests:
+    memory: 2Gi
+    cpu: 500m
+
+# Pod configurations
+podAnnotations: {}
+podLabels: {}
+
+# Security context
+securityContext:
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Persistence configuration
+persistence:
+  enabled: true
+  size: 8Gi
+  storageClass: "gp2"
+  accessModes:
+    - ReadWriteOnce
+
+# Prometheus metrics
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    namespace: "default"
+    interval: "10s"
+
+# Extra volumes and mounts for secrets/configs
+extraVolumes: []
+extraVolumeMounts: []
+
+# Environment variables
+extraEnvVars:
+  - name: TZ
+    value: "CST6CDT"
+extraEnvVarsCM: ""
+extraEnvVarsSecret: ""
+
+# Init containers
+initContainers: []
+
+# Sidecars
+sidecars: []
+
+# Health check
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
