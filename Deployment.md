@@ -1,4 +1,4 @@
-# Deploy all services regarding kafka
+# Deploy all services regarding kafka deployment
 
 
 # Kafka Deployment Updation
